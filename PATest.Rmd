@@ -1,0 +1,149 @@
+Reproducible Research Project
+=============================
+        
+        Data Loading and Preprocessing
+------------------------------
+        The dataset is found in a zip file downloaded from the following link: 
+        [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+This contains a zip file titled "activity.csv" which is extracted.
+The dataset will be loaded into variable "dataset".
+
+```{r}
+dataset <- read.csv("./activity.csv")
+```
+
+Mean and Median of the total steps taken during the day
+--------------------------------------------------------
+        
+        First the "dataset" variable must be cleansed of omit's.  
+The dplyr package will be loaded in order to group the days together.  
+Then mean and median of total steps per day taken will be output under column names avg_steps and median, respectively.
+The ggplot2 package will be loaded for the histogram of total steps per day.
+```{r, include=TRUE, fig.width=4,fig.height=3}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(lattice)
+dataset2 <- na.omit(dataset)%>%
+group_by(date)%>%
+summarize(avg_steps = mean(steps), median = median(steps))
+histdata <- na.omit(dataset)%>%
+group_by(date)%>%
+summarize(Total = sum(steps))
+
+p <- ggplot(histdata, aes(x=date, y=Total, width=.5)) + geom_histogram(stat="identity")
+p + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+return(dataset2)
+```
+
+Average Daily Activity
+----------------------
+
+In order to graph the data of average steps per 5 minutes over the duration of the project, I must first group the dataset by the 
+variable "interval".  This new dataset be saved as "intervaldf".
+
+```{r}
+library(dplyr)
+intervaldf <- na.omit(dataset)%>%
+group_by(interval) %>%
+arrange(date, interval, steps)%>%
+summarize(avg_steps=mean(steps))
+intervaldf <- as.data.frame(intervaldf)
+stepmax <- max(intervaldf$avg_steps)
+intervalmax <- vector()
+for(i in 1:nrow(intervaldf)){
+if(intervaldf[i,2]==stepmax){
+intervalmax <- intervaldf[i,1]
+}
+}
+
+```
+Here is the plot of the intervals (x-axis) in coordination with the average steps taken (y-axis):
+```{r}
+
+plot(intervaldf, type="l")
+
+```
+
+The interval with the highest step average is:
+```{r}
+return(intervalmax)
+```
+
+Inputing Missing Values
+-----------------------
+
+The sum of the missing values totals to:
+```{r}
+df <- read.csv("./activity.csv")
+sum(is.na(df))
+```
+
+There are many missing values titled "NA" in this dataset.  I have chosen to replace those values with the average step taken for that interval that was discovered above.  The new name for this data set is "df".
+
+```{r}
+for(j in 1:nrow(df)){
+if(is.na(df[j,1])){
+for(h in 1:nrow(intervaldf)){
+if(df[j,3]==intervaldf[h,1]){
+df[j,1] <- intervaldf[h,2]
+}
+}
+}
+}
+```
+
+Then a mean and median, by date, for this new dataset need to be procurred.  They will be saved in "df1".  
+I will create a dataset with a total steps per day "histdf".
+
+```{r}
+
+df1 <- group_by(df, date)%>%
+summarize(avg_steps = mean(steps), median = median(steps))
+histdf <-  group_by(df, date)%>%
+summarize(Total = sum(steps))
+ratingA <- data.frame(rating=rep("With NA",53))
+histdata <- cbind(histdata,ratingA)
+ratingB <- data.frame(rating=rep("Without NA",61))
+histdf <- cbind(histdf,ratingB)
+totaldf <- rbind(histdata,histdf)
+
+q <- ggplot(totaldf, aes(x=date, y=Total, fill=rating, width=.5)) + geom_histogram(stat="identity",binwidth=.5)
+q + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+return(df1)
+```
+
+Activity Patterns between Weekdays and Weekends
+===============================================
+First the data frame must be separated between weekend and weekdays.  Then it is organized and divided by "weekday" and "weekend".  This helps to complete the graph which follows below.
+
+```{r}
+
+df$day <- weekdays(as.Date(df$date))
+
+
+for(g in 1:nrow(df)){
+if(df[g,4]=="Saturday"){
+df[g,5] <- "Weekend"
+}
+else if(df[g,4]=="Sunday"){
+df[g,5] <- "Weekend"                
+}
+else{
+df[g,5] <- "Weekday"
+}
+
+}
+names(df)[names(df)=="V5"] <- "Day_End"
+
+DayEnddf <- group_by(df, Day_End, interval)%>%
+summarize(avg_steps=mean(steps))%>%
+arrange(Day_End, interval, avg_steps)
+dedf <- as.data.frame(DayEnddf)
+
+ggplot(dedf, aes(x=interval, y=avg_steps, color=Day_End, width=.5)) + geom_line(stat="identity",size=1)
+
+
+```
